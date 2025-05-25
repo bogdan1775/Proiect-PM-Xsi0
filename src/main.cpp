@@ -23,9 +23,9 @@ inline void buzzerOff() { PORTD &= ~_BV(BUZZER_BIT); }
 #define DEAD_ZONE 100
 
 // LED RGB
-#define LED_R 11  // OC2A
-#define LED_G 10  // OC1B
-#define LED_B 9   // OC1A
+#define LED_R 11
+#define LED_G 10 
+#define LED_B 9
 
 void setRGB(uint8_t r, uint8_t g, uint8_t b) {
   if (r == 0 && g == 0 && b == 0) {
@@ -59,14 +59,14 @@ GameMode gameMode = MODE_AI;
 
 int readAnalog(uint8_t channel) {
   ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
-  ADMUX |= (1 << REFS0); // AVcc as reference
+  ADMUX |= (1 << REFS0);
   ADCSRA |= (1 << ADSC);
   while (ADCSRA & (1 << ADSC));
   return ADC;
 }
 
 bool readJoystickButton() {
-  return !(PINB & (1 << JOY_BTN_BIT)); // Active LOW
+  return !(PINB & (1 << JOY_BTN_BIT));
 }
 
 void showMenu() {
@@ -178,7 +178,7 @@ void resetGame() {
     scoreX = 0;
     scoreO = 0;
   }
-  setRGB(0, 0, 0); // Stinge LED RGB
+  setRGB(0, 0, 0); 
 }
 
 void drawBoard() {
@@ -319,9 +319,9 @@ void setup() {
   ADCSRA |= (1 << ADEN);
 
 
-  DDRB |= (1 << DDB3); // Pin 11 - OC2A - LED R
-  DDRB |= (1 << DDB2); // Pin 10 - OC1B - LED G
-  DDRB |= (1 << DDB1); // Pin 9  - OC1A - LED B
+  DDRB |= (1 << DDB3);
+  DDRB |= (1 << DDB2);
+  DDRB |= (1 << DDB1);
 
   TCCR2A = (1 << COM2A1) | (1 << WGM20);  
   TCCR2B = (1 << CS21); 
