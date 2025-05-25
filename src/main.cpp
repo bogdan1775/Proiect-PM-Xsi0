@@ -29,15 +29,14 @@ inline void buzzerOff() { PORTD &= ~_BV(BUZZER_BIT); }
 
 void setRGB(uint8_t r, uint8_t g, uint8_t b) {
   if (r == 0 && g == 0 && b == 0) {
-    // Dezactivează PWM
-    TCCR1A &= ~((1 << COM1A1) | (1 << COM1B1)); // OC1A & OC1B
-    TCCR2A &= ~(1 << COM2A1);                   // OC2A
 
-    // Setează pinii manual pe LOW
-    PORTB &= ~((1 << PB1) | (1 << PB2)); // D9 (OC1A), D10 (OC1B)
-    PORTB &= ~(1 << PB3);                // D11 (OC2A)
+    TCCR1A &= ~((1 << COM1A1) | (1 << COM1B1)); 
+    TCCR2A &= ~(1 << COM2A1);                  
+
+    PORTB &= ~((1 << PB1) | (1 << PB2)); 
+    PORTB &= ~(1 << PB3);                
   } else {
-    // Repornește PWM
+    
     TCCR1A |= (1 << COM1A1) | (1 << COM1B1);
     TCCR2A |= (1 << COM2A1);
 
@@ -46,7 +45,7 @@ void setRGB(uint8_t r, uint8_t g, uint8_t b) {
     OCR1A = b;  // D9  - albastru
   }}
 
-// Joc
+
 char board[3][3];
 int cursorX = 0;
 int cursorY = 0;
@@ -319,32 +318,21 @@ void setup() {
   // ADC
   ADCSRA |= (1 << ADEN);
 
-  // // RGB LED ca OUTPUT
-  // DDRB |= (1 << PB1) | (1 << PB2); // D9, D10
-  // DDRD |= (1 << PD5);              // D11
 
-  // // PWM Timers setup
-  // TCCR1A = (1 << COM1A1) | (1 << COM1B1) | (1 << WGM10);
-  // TCCR1B = (1 << WGM12) | (1 << CS11);
-  // TCCR2A = (1 << COM2A1) | (1 << WGM20) | (1 << WGM21);
-  // TCCR2B = (1 << CS21);
-  // Setăm pinii ca output
   DDRB |= (1 << DDB3); // Pin 11 - OC2A - LED R
   DDRB |= (1 << DDB2); // Pin 10 - OC1B - LED G
   DDRB |= (1 << DDB1); // Pin 9  - OC1A - LED B
 
-  // TIMER2 – pentru LED roșu (OC2A - pin 11)
-  TCCR2A = (1 << COM2A1) | (1 << WGM20);  // Fast PWM, non-inverting OC2A
-  TCCR2B = (1 << CS21); // Prescaler 8 → ~7.8 kHz
+  TCCR2A = (1 << COM2A1) | (1 << WGM20);  
+  TCCR2B = (1 << CS21); 
 
-  // TIMER1 – pentru LED verde (OC1B - pin 10) și albastru (OC1A - pin 9)
-  TCCR1A = (1 << COM1A1) | (1 << COM1B1) | (1 << WGM10);  // Fast PWM 8-bit
-  TCCR1B = (1 << WGM12) | (1 << CS11);  // Prescaler 8 → ~7.8 kHz
-  // Dezactivează PWM
-  TCCR1A &= ~((1 << COM1A1) | (1 << COM1B1)); // OC1A & OC1B
-  TCCR2A &= ~(1 << COM2A1);                   // OC2A
+  
+  TCCR1A = (1 << COM1A1) | (1 << COM1B1) | (1 << WGM10); 
+  TCCR1B = (1 << WGM12) | (1 << CS11);
+  
+  TCCR1A &= ~((1 << COM1A1) | (1 << COM1B1));
+  TCCR2A &= ~(1 << COM2A1);                   
 
-  // Setează pinii manual pe LOW
   PORTB &= ~((1 << PB1) | (1 << PB2)); // D9 (OC1A), D10 (OC1B)
   PORTB &= ~(1 << PB3); 
 
