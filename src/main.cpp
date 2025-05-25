@@ -40,9 +40,9 @@ void setRGB(uint8_t r, uint8_t g, uint8_t b) {
     TCCR1A |= (1 << COM1A1) | (1 << COM1B1);
     TCCR2A |= (1 << COM2A1);
 
-    OCR2A = r;  // D11 - roșu
-    OCR1B = g;  // D10 - verde
-    OCR1A = b;  // D9  - albastru
+    OCR2A = r;
+    OCR1B = g;
+    OCR1A = b; 
   }}
 
 
