@@ -333,7 +333,7 @@ void setup() {
   TCCR1A &= ~((1 << COM1A1) | (1 << COM1B1));
   TCCR2A &= ~(1 << COM2A1);                   
 
-  PORTB &= ~((1 << PB1) | (1 << PB2)); // D9 (OC1A), D10 (OC1B)
+  PORTB &= ~((1 << PB1) | (1 << PB2));
   PORTB &= ~(1 << PB3); 
 
   display.begin();
