@@ -1,3 +1,6 @@
+// Croitoru Constantin-Bogdan
+// grupa 334CA
+
 #include <Arduino.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_PCD8544.h>
@@ -7,45 +10,42 @@
 #define PIN_DIN  6
 #define PIN_DC   5
 #define PIN_CS   4
-#define PIN_RST  3
+#define PIN_RST  12 // initial 3, dar l-am schimbat ca sa-l folosesc la buzzer
 Adafruit_PCD8544 display(PIN_SCLK, PIN_DIN, PIN_DC, PIN_CS, PIN_RST);
 
 // Joystick
-#define JOY_X_CHANNEL 0
-#define JOY_Y_CHANNEL 1
-#define JOY_BTN_BIT 0  // PB0 = D8
+#define JOY_X_CHANNEL PC0 //A0
+#define JOY_Y_CHANNEL PC1 //A1
+#define JOY_BTN_BIT PB0  // D8
 
 // Buzzer
-#define BUZZER_BIT 2  // PD2
-inline void buzzerOn()  { PORTD |=  _BV(BUZZER_BIT); }
-inline void buzzerOff() { PORTD &= ~_BV(BUZZER_BIT); }
+#define BUZZER_PIN 3  // PWM cu timer2
+
+// LED RGB
+#define LED_R PB3 // D11
+#define LED_G PB2 // D10
+#define LED_B PB1 // D9
 
 #define DEAD_ZONE 100
 
-// LED RGB
-#define LED_R 11
-#define LED_G 10 
-#define LED_B 9
+void setRGB(bool r, bool g, bool b) {
+  if (r) 
+    PORTB |= (1 << LED_R); 
+  else 
+    PORTB &= ~(1 << LED_R);
 
-void setRGB(uint8_t r, uint8_t g, uint8_t b) {
-  if (r == 0 && g == 0 && b == 0) {
+  if (g) 
+    PORTB |= (1 << LED_G); 
+  else 
+    PORTB &= ~(1 << LED_G);
 
-    TCCR1A &= ~((1 << COM1A1) | (1 << COM1B1)); 
-    TCCR2A &= ~(1 << COM2A1);                  
+  if (b) 
+    PORTB |= (1 << LED_B); 
+  else 
+    PORTB &= ~(1 << LED_B);
+}
 
-    PORTB &= ~((1 << PB1) | (1 << PB2)); 
-    PORTB &= ~(1 << PB3);                
-  } else {
-    
-    TCCR1A |= (1 << COM1A1) | (1 << COM1B1);
-    TCCR2A |= (1 << COM2A1);
-
-    OCR2A = r;
-    OCR1B = g;
-    OCR1A = b; 
-  }}
-
-
+// pentru joc
 char board[3][3];
 int cursorX = 0;
 int cursorY = 0;
@@ -59,7 +59,7 @@ GameMode gameMode = MODE_AI;
 
 int readAnalog(uint8_t channel) {
   ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
-  ADMUX |= (1 << REFS0);
+  ADMUX |= (1 << REFS0); // AVcc
   ADCSRA |= (1 << ADSC);
   while (ADCSRA & (1 << ADSC));
   return ADC;
@@ -69,6 +69,53 @@ bool readJoystickButton() {
   return !(PINB & (1 << JOY_BTN_BIT));
 }
 
+// PWM control buzzer
+void startPWM(uint16_t freqHz) {
+  pinMode(BUZZER_PIN, OUTPUT);
+  uint32_t top = (F_CPU / (2UL * 64UL * freqHz)) - 1;
+  if (top > 255) 
+    top = 255;  // OCR2A max = 255
+
+  TCCR2A = (1 << COM2B1) | (1 << WGM21) | (1 << WGM20); // Fast PWM, OC2B
+  TCCR2B = (1 << WGM22) | (1 << CS22);                 // Prescaler = 64
+  OCR2A = top;
+  OCR2B = top / 2; // 50% duty cycle
+}
+
+void stopPWM() {
+  TCCR2A = 0;
+  TCCR2B = 0;
+  digitalWrite(BUZZER_PIN, LOW);
+}
+
+void playTone(uint16_t freqHz, uint16_t durMs) {
+  startPWM(freqHz);
+  delay(durMs);
+  stopPWM();
+}
+
+void winMelody() {
+  playTone(262, 200); 
+  delay(50);
+  playTone(330, 200);
+  delay(50);
+  playTone(392, 200); 
+  delay(50);
+  playTone(523, 300); 
+  delay(50);
+}
+
+void lossMelody() {
+  playTone(392, 200); 
+  delay(50);
+  playTone(330, 200); 
+  delay(50);
+  playTone(262, 300); 
+  delay(50);
+}
+
+
+// functie pentru afisare meniu-lui
 void showMenu() {
   int selection = 0;
   bool selected = false;
@@ -85,19 +132,25 @@ void showMenu() {
         lastMove = millis();
       }
     }
+
     if (readJoystickButton()) {
       gameMode = (selection == 0) ? MODE_AI : MODE_RANDOM;
       selected = true;
       delay(500);
     }
+
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println("Alege Mod Joc:");
+
     display.setCursor(0, 10);
-    if (selection == 0) display.print("> ");
+    if (selection == 0) 
+      display.print("> ");
     display.println("1. Contra AI");
+
     display.setCursor(0, 20);
-    if (selection == 1) display.print("> ");
+    if (selection == 1)
+      display.print("> ");
     display.println("2. Random O");
     display.display();
   }
@@ -109,29 +162,8 @@ void showMenu() {
   delay(1000);
 }
 
-void playTone(uint16_t freqHz, uint16_t durMs) {
-  const uint32_t halfPeriod_us = 500000UL / freqHz;
-  uint32_t cycles = (uint32_t)freqHz * durMs / 1000UL;
-  for (uint32_t i = 0; i < cycles; ++i) {
-    buzzerOn();
-    delayMicroseconds(halfPeriod_us);
-    buzzerOff();
-    delayMicroseconds(halfPeriod_us);
-  }
-}
 
-void winMelody() {
-  playTone(262, 200); delay(50);
-  playTone(330, 200); delay(50);
-  playTone(392, 200); delay(50);
-  playTone(523, 300); delay(50);
-}
-void lossMelody() {
-  playTone(392, 200); delay(50);
-  playTone(330, 200); delay(50);
-  playTone(262, 300); delay(50);
-}
-
+// functia pentru resetarea scorului
 bool resetScore() {
   int selection = 0;
   unsigned long lastMove = 0;
@@ -147,6 +179,7 @@ bool resetScore() {
         lastMove = millis();
       }
     }
+
     if (readJoystickButton()) {
       delay(300);
       return (selection == 0);
@@ -155,16 +188,21 @@ bool resetScore() {
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println("Resetezi scorul?");
+
     display.setCursor(0, 17);
-    if (selection == 0) display.print("> ");
+    if (selection == 0) 
+      display.print("> ");
     display.println("Da");
+
     display.setCursor(0, 27);
-    if (selection == 1) display.print("> ");
+    if (selection == 1) 
+      display.print("> ");
     display.println("Nu");
     display.display();
   }
 }
 
+// resetare joc
 void resetGame() {
   for (int y = 0; y < 3; y++)
     for (int x = 0; x < 3; x++)
@@ -178,19 +216,22 @@ void resetGame() {
     scoreX = 0;
     scoreO = 0;
   }
-  setRGB(0, 0, 0); 
+  setRGB(0, 0, 0);
 }
 
 void drawBoard() {
   display.clearDisplay();
+
   for (int y = 0; y < 3; y++) {
     for (int x = 0; x < 3; x++) {
       int px = x * 15;
       int py = y * 15;
       display.drawRect(px, py, 14, 14, BLACK);
+
       if (board[y][x] == 'X' || board[y][x] == 'O') {
         display.setCursor(px + 4, py + 3);
         display.print(board[y][x]);
+
       } else if (x == cursorX && y == cursorY && !gameOver) {
         display.setCursor(px + 4, py + 3);
         display.print('X');
@@ -213,8 +254,10 @@ void drawBoard() {
 
 bool checkWin(char player) {
   for (int i = 0; i < 3; i++) {
-    if (board[i][0] == player && board[i][1] == player && board[i][2] == player) return true;
-    if (board[0][i] == player && board[1][i] == player && board[2][i] == player) return true;
+    if (board[i][0] == player && board[i][1] == player && board[i][2] == player)
+     return true;
+    if (board[0][i] == player && board[1][i] == player && board[2][i] == player)
+     return true;
   }
   return (board[0][0] == player && board[1][1] == player && board[2][2] == player) ||
          (board[0][2] == player && board[1][1] == player && board[2][0] == player);
@@ -223,14 +266,18 @@ bool checkWin(char player) {
 bool isBoardFull() {
   for (int y = 0; y < 3; y++)
     for (int x = 0; x < 3; x++)
-      if (board[y][x] == ' ') return false;
+      if (board[y][x] == ' ')
+       return false;
   return true;
 }
 
 int minimax(bool isMaximizing, int depth) {
-  if (checkWin('O')) return 17;
-  if (checkWin('X')) return -17;
-  if (isBoardFull()) return 0;
+  if (checkWin('O'))
+    return 17 - depth;
+  if (checkWin('X'))
+   return -17 - depth;
+  if (isBoardFull())
+    return 0;
 
   if (isMaximizing) {
     int bestScore = -1000;
@@ -245,6 +292,7 @@ int minimax(bool isMaximizing, int depth) {
       }
     }
     return bestScore;
+
   } else {
     int bestScore = 1000;
     for (int y = 0; y < 3; y++) {
@@ -280,7 +328,7 @@ void moveAI() {
   }
   if (moveX != -1 && moveY != -1) {
     board[moveY][moveX] = 'O';
-    setRGB(255, 0, 0);
+    setRGB(1, 0, 0);
   }
   delay(1000);
 }
@@ -297,19 +345,17 @@ void moveRandom() {
       }
     }
   }
+  
   if (count > 0) {
     int r = random(count);
     board[empty[r][0]][empty[r][1]] = 'O';
-    setRGB(255, 0, 0);
+    setRGB(1, 0, 0);
   }
   delay(1000);
 }
 
 void setup() {
   Serial.begin(9600);
-
-  // Buzzer
-  DDRD |= _BV(BUZZER_BIT);
 
   // Joystick button
   DDRB &= ~(1 << JOY_BTN_BIT);
@@ -318,26 +364,13 @@ void setup() {
   // ADC
   ADCSRA |= (1 << ADEN);
 
+  // LED RGB ca output
+  DDRB |= (1 << PB1) | (1 << PB2) | (1 << PB3);
 
-  DDRB |= (1 << DDB3);
-  DDRB |= (1 << DDB2);
-  DDRB |= (1 << DDB1);
-
-  TCCR2A = (1 << COM2A1) | (1 << WGM20);  
-  TCCR2B = (1 << CS21); 
-
-  
-  TCCR1A = (1 << COM1A1) | (1 << COM1B1) | (1 << WGM10); 
-  TCCR1B = (1 << WGM12) | (1 << CS11);
-  
-  TCCR1A &= ~((1 << COM1A1) | (1 << COM1B1));
-  TCCR2A &= ~(1 << COM2A1);                   
-
-  PORTB &= ~((1 << PB1) | (1 << PB2));
-  PORTB &= ~(1 << PB3); 
+  setRGB(0, 0, 0);
 
   display.begin();
-  display.setContrast(60);
+  display.setContrast(20);
   showMenu();
   resetGame();
 }
@@ -348,12 +381,16 @@ void loop() {
   bool btn = readJoystickButton();
 
   if (!gameOver && turnX) {
-    setRGB(0, 0, 255);
+    setRGB(0, 0, 1);
 
-    if (x < 512 - DEAD_ZONE && cursorX > 0) cursorX--;
-    if (x > 512 + DEAD_ZONE && cursorX < 2) cursorX++;
-    if (y < 512 - DEAD_ZONE && cursorY > 0) cursorY--;
-    if (y > 512 + DEAD_ZONE && cursorY < 2) cursorY++;
+    if (x < 512 - DEAD_ZONE && cursorX > 0)
+      cursorX--;
+    if (x > 512 + DEAD_ZONE && cursorX < 2)
+      cursorX++;
+    if (y < 512 - DEAD_ZONE && cursorY > 0)
+      cursorY--;
+    if (y > 512 + DEAD_ZONE && cursorY < 2)
+      cursorY++;
     delay(150);
 
     if (btn && board[cursorY][cursorX] == ' ') {
@@ -362,19 +399,22 @@ void loop() {
       if (checkWin('X')) {
         scoreX++;
         gameOver = true;
+        setRGB(0, 1, 0);
         winMelody();
-        setRGB(0, 255, 0);
+        //setRGB(0, 1, 0);
         delay(1500);
         resetGame();
         showMenu();
+
       } else if (isBoardFull()) {
         gameOver = true;
-        setRGB(0, 0, 255);
+        setRGB(0, 0, 1);
         delay(1500);
         resetGame();
         showMenu();
       }
     }
+
   } else if (!gameOver && !turnX) {
     if (gameMode == MODE_AI) moveAI();
     else moveRandom();
@@ -382,14 +422,15 @@ void loop() {
     if (checkWin('O')) {
       scoreO++;
       gameOver = true;
+      setRGB(1, 0, 0);
       lossMelody();
-      setRGB(255, 0, 0);
+      //setRGB(1, 0, 0);
       delay(1500);
       resetGame();
       showMenu();
     } else if (isBoardFull()) {
       gameOver = true;
-      setRGB(0, 0, 255);
+      setRGB(0, 0, 1);
       delay(1500);
       resetGame();
       showMenu();
